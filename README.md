@@ -10,17 +10,15 @@
 
 ---
 
-### Flips, from the top of the run
+### Flips, and the top of the run
 
-<video src="https://github.com/Alezander9/Flowline/raw/main/media/flip-and-opening-run.mp4" controls muted loop width="100%"></video>
-
-<sub>Not playing? [Watch flip-and-opening-run.mp4](media/flip-and-opening-run.mp4)</sub>
+[![Flips and the opening run](media/poster-flip.jpg)](media/flip-and-opening-run.mp4)
 
 ### Deformable snow, up close
 
-<video src="https://github.com/Alezander9/Flowline/raw/main/media/deformable-snow.mp4" controls muted loop width="100%"></video>
+[![Deformable snow](media/poster-snow.jpg)](media/deformable-snow.mp4)
 
-<sub>Not playing? [Watch deformable-snow.mp4](media/deformable-snow.mp4)</sub>
+<sub>Click either image to play the clip.</sub>
 
 ---
 
@@ -39,7 +37,7 @@
 | `M` | Music |
 | `?` | Help |
 
-Phones and tablets get on-screen controls automatically. Flips are keyboard only.
+Phones and tablets get on-screen controls automatically. Flips are keyboard only, and landing one badly hurts.
 
 ### Run it yourself
 
@@ -51,10 +49,10 @@ cd Flowline
 python3 build.py
 ```
 
-That writes `flowline.html`: one self-contained ~750 KB file, no assets folder, no server. Open it in any browser.
+That writes `flowline.html`: one self-contained file of about 750 KB, no assets folder and no server. Open it in any browser.
 
-The terrain, trees, snow, sky and music are all generated in code from a seed — everyone riding the same seed rides the same mountain.
+The terrain, trees, snow, sky and music are all generated in code from a seed, so everyone riding the same seed rides the same mountain.
 
 ### Multiplayer
 
-The client (`src/net.js`) expects a websocket relay at `wss://<host>/ws/<room>`. With one, riders share a mountain and see each other's lines. Without one, the game runs single player.
+The client (`src/net.js`) expects a websocket relay at `wss://<host>/ws/<room>`. With one, riders share a mountain and can see each other's lines. Without one, the game runs single player.
