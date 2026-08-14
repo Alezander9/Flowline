@@ -6,6 +6,8 @@
 
 <p align="center">
   <a href="https://flowline.games.bu.app"><b>▶&nbsp; Play now</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://alezander9.github.io/Flowline/">GitHub Pages mirror</a>
 </p>
 
 ---
@@ -56,7 +58,11 @@ The terrain, trees, snow, sky and music are all generated in code from a seed, s
 
 ### Multiplayer
 
-The client (`src/net.js`) expects a websocket relay at `wss://<host>/ws/<room>`. With one, riders share a mountain and can see each other's lines. Without one, the game runs single player.
+Everyone shares one mountain. `src/net.js` opens a websocket to a relay and riders see each other's lines in real time.
+
+The relay it picks: the current origin when the game is served from `games.bu.app`, otherwise the public relay at `wss://flowline.games.bu.app/ws/<room>`. So the Pages mirror above — and a copy you serve yourself — join the **same rooms as the live site**. Opened from a `file://` path the game skips networking entirely and runs single player.
+
+Rooms come from the world seed, so everyone lands together by default. Add `#room=name` to the url for a private one.
 
 ### License
 

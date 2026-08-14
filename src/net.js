@@ -113,7 +113,18 @@ class Net {
   connect() {
     if (!/^https?:/.test(location.protocol)) return;
     try {
-      const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/${this.room}`);
+      /* The relay only exists on the games.bu.app origin. A MIRROR (GitHub
+         Pages, a local http server, anywhere else) has no /ws/ path of its own,
+         so deriving the host from location.host there dialled a socket that can
+         never open: a 4 s retry loop forever, plus an empty all-time board
+         because `top` arrives in the welcome frame. Falling back to the absolute
+         host also puts every mirror in the SAME rooms as prod - one mountain,
+         not a second empty world. VERIFIED the relay accepts cross-origin.
+         *** INERT ON games.bu.app: same host, same protocol as before. *** */
+      const same = /(^|\.)games\.bu\.app$/.test(location.hostname);
+      const proto = (same && location.protocol !== 'https:') ? 'ws' : 'wss';
+      const host = same ? location.host : 'flowline.games.bu.app';
+      const ws = new WebSocket(`${proto}://${host}/ws/${this.room}`);
       this.ws = ws;
       ws.onopen = () => { this.connected = true; UI.net(true); this.hello(); };
       ws.onclose = () => { this.connected = false; UI.net(false); setTimeout(() => this.connect(), 4000); };
