@@ -12,13 +12,11 @@
 
 ### Flips, and the top of the run
 
-[![Flips and the opening run](media/poster-flip.jpg)](media/flip-and-opening-run.mp4)
+https://github.com/user-attachments/assets/ac0445e1-2f3a-4a23-a314-85dff5c0e908
 
 ### Deformable snow, up close
 
-[![Deformable snow](media/poster-snow.jpg)](media/deformable-snow.mp4)
-
-<sub>Click either image to play the clip.</sub>
+https://github.com/user-attachments/assets/22dedd25-b243-424d-ad7e-ba35f00c7a54
 
 ---
 
