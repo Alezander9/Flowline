@@ -235,15 +235,16 @@ SnowSurf snowSurf(float groom, float packed, float ice){
   SnowSurf s;
   float loose = (1.0-packed)*(1.0-ice);
   s.rough = mix(0.62, 0.78, loose);
-  s.rough = mix(s.rough, 0.34, packed);
+  s.rough = mix(s.rough, 0.22, packed);
   s.rough = mix(s.rough, 0.07, ice);
-  s.thick = mix(1.0, 0.35, packed);
+  s.thick = mix(1.0, 0.28, packed);
   s.thick = mix(s.thick, 0.15, ice);
-  s.f0    = mix(vec3(0.028), vec3(0.045), ice);
-  s.wrap  = mix(0.62, 0.15, max(packed, ice));
-  s.alb   = mix(vec3(0.92,0.945,0.985), vec3(0.955,0.965,0.99), groom);
-  s.alb   = mix(s.alb, vec3(0.62,0.665,0.755), packed*0.40);
-  s.alb   = mix(s.alb, vec3(0.42,0.56,0.70), ice*0.80);
+  s.f0    = mix(vec3(0.028), vec3(0.055), packed);
+  s.f0    = mix(s.f0, vec3(0.070), ice);
+  s.wrap  = mix(0.62, 0.12, max(packed, ice));
+  s.alb   = mix(vec3(0.945,0.958,0.978), vec3(0.975,0.982,0.995), groom);
+  s.alb   = mix(s.alb, vec3(0.52,0.57,0.66), packed*0.72);
+  s.alb   = mix(s.alb, vec3(0.62,0.70,0.78), ice*0.42);
   return s;
 }
 
@@ -577,7 +578,7 @@ const SNOW_FRAG = GLSL_COMMON + GLSL_SNOW + GLSL_SHADOW + GLSL_CASCADE + GLSL_DE
           vec4 DF = dfFetch(wp.xz);
           float dfAny = DF.x + DF.y;
           float trk  = smoothstep(pw + 0.15, pw - 0.75, tad);
-          float rf = smoothstep(260.0,45.0,dist);
+          float rf = smoothstep(820.0,40.0,dist);
           float crease = exp(-pow((tad - pw - 0.35) / 0.55, 2.0)) * smoothstep(11.0, 6.0, tad);
 
           /* ---------------- surface state -------------------------------
@@ -643,7 +644,7 @@ const SNOW_FRAG = GLSL_COMMON + GLSL_SNOW + GLSL_SHADOW + GLSL_CASCADE + GLSL_DE
              - on a piste a ridden line is visible because it has WIPED OUT the
              groomer's ridges, not because it is deep
              (uploads/snowboard_heavy_tracks_piste.png, gondola_piste_texture.jpg). */
-          float cordF = groom*(1.0-ice)*smoothstep(210.0,30.0,dist)*(1.0 - clamp(DF.z*1.30, 0.0, 1.0));
+          float cordF = groom*(1.0-ice)*smoothstep(640.0,28.0,dist)*(1.0 - clamp(DF.z*1.85, 0.0, 1.0));
           g.x += cos(vLat*3.05)*3.05*0.020*cordF;
           // board ruts inside a poach line
           g.y += cos(tad*8.5 + wp.z*0.5)*0.014*trk*rf;
@@ -664,6 +665,14 @@ const SNOW_FRAG = GLSL_COMMON + GLSL_SNOW + GLSL_SHADOW + GLSL_CASCADE + GLSL_DE
 
           /* ---------------- albedo ------------------------------------- */
           surf.alb *= 1.0 - 0.10*cord*cordF;      // corduroy is terrain-only
+          /* Board line is NOT the packed channel — on a groomed piste groom already
+             saturates packed to 1, so that channel cannot mark a track.
+             DF.x (cut depth) and DF.z (this stamp's compression) are zero
+             off the line, so they are the only honest mask. */
+          float boardLine = max(smoothstep(0.005, 0.050, DF.x), DF.z);
+          surf.alb *= 1.0 - 0.38*boardLine*rf;
+          surf.rough = mix(surf.rough, 0.13, boardLine*0.70*rf);
+          surf.alb *= 1.0 + 0.10*smoothstep(0.03, 0.20, DF.y)*rf;
 
           /* ---------------- lighting ----------------------------------- */
           vec3 V = -vd, L = uSun;
@@ -704,11 +713,18 @@ const SNOW_FRAG = GLSL_COMMON + GLSL_SNOW + GLSL_SHADOW + GLSL_CASCADE + GLSL_DE
           float lvl = clamp(log2(max(dist,4.0)/17.0), 0.0, 3.99);
           float lf = floor(lvl), fr = lvl - lf;
           float cs = 0.125*exp2(lf);
-          float thr = 0.945 - 0.02*uDetail;
+          float thr = 0.88 - 0.03*uDetail;
           float twinkle = glint(vW.xz, cs, thr, uTime*7.0)*(1.0-fr)
                         + glint(vW.xz, cs*2.0, thr, uTime*7.0+1.7)*fr;
-          col += uSunCol*sp*twinkle*0.55*4.0*graze*(1.0-ice*0.7)*(1.0-trk*0.7)
-               * smoothstep(240.0,26.0,dist)*(1.0-rsh);
+          float tw2 = glint(vW.xz*1.7+vec2(11.3,4.1), cs*0.55, thr-0.03, uTime*11.0);
+          col += uSunCol*sp*(twinkle*1.15*6.4 + tw2*0.70*4.2)*graze
+               *(1.0-ice*0.35)*(1.0-trk*0.22)
+               * smoothstep(980.0,16.0,dist)*(1.0-rsh);
+          /* crisp sun glitter on open snow — packed piste sparkles too */
+          float dust = glint(vW.xz*0.31, 0.48, 0.82, uTime*1.7);
+          float dust2 = glint(vW.xz*0.19+vec2(3.1,8.4), 0.95, 0.86, uTime*0.9);
+          col += uSunCol*vec3(1.08,1.01,0.92)*(dust*0.14 + dust2*0.09)*graze
+               *(0.35 + 0.65*loose)*(1.0-rsh)*smoothstep(1400.0,28.0,dist);
 
           col = applyFog(col, dist, vd);
           gl_FragColor = vec4(outc(col),1.0);
@@ -1188,3 +1204,4 @@ class TerrainMesh {
     return true;
   }
 }
+

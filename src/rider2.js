@@ -291,6 +291,10 @@ Object.assign(Rider.prototype, {
   postStep(dt) {
     this.shake = approach(this.shake, 0, 3.4, dt);
     this.bump = approach(this.bump, 0, 6, dt);
+    const a = clamp((G.acc || 0) / FIXED, 0, 1);
+    this.pDraw.lerpVectors(this.pPrev, this.p, a);
+    this.yawDraw = this.yawPrev + wrapAngle(this.yaw - this.yawPrev) * a;
+    this.nDraw.lerp(this.n, 1 - Math.exp(-14 * dt)).normalize();
     this.body.update(this, dt);
     /* Airborne snow only: the track itself is real terrain displacement now.
        The RATE lives in fx.spray and is derived from `this.cutD`, the actual rut
@@ -321,7 +325,7 @@ const CAM = {
    (every term takes its target directly), so 0 is safe. */
 function camCut() { CAM.snap(); updateCamera(0); }
 function updateCamera(dt) {
-  const r = G.rider, p = r.p;
+  const r = G.rider, p = r.pDraw || r.p;
   if (G.dbg.orbit) {                       // debug: close orbit around the rider
     const o = G.dbg.orbit, a = o.a === undefined ? (G.t * 0.35) : o.a;
     G.cam.position.set(p.x + Math.sin(a) * o.d, p.y + o.h, p.z + Math.cos(a) * o.d);
@@ -339,8 +343,8 @@ function updateCamera(dt) {
      height, shake) - a similarity transform, so the dynamics and the framing are
      untouched and only the scale changes. See CAMZ in util.js. */
   const zm = CAMZ.zoom;
-  const wantD = (6.6 + spN * 2.6 + air * 1.5) * (1 - 0.13 * vf.p - 0.30 * vf.s) * zm;
-  const wantH = (2.15 + spN * 0.62 + air * 0.9 + r.crouch * -0.22) * (1 - 0.10 * vf.p - 0.16 * vf.s) * zm;
+  const wantD = (4.4 + spN * 1.55 + air * 1.2) * (1 - 0.13 * vf.p - 0.30 * vf.s) * zm;
+  const wantH = (1.55 + spN * 0.42 + air * 0.7 + r.crouch * -0.18) * (1 - 0.10 * vf.p - 0.16 * vf.s) * zm;
   CAM.dist = snap ? wantD : approach(CAM.dist, wantD, 3.0, dt);
   CAM.hgt = snap ? wantH : approach(CAM.hgt, wantH, 3.0, dt);
   const sy = Math.sin(CAM.yaw), cy = Math.cos(CAM.yaw);
@@ -354,17 +358,21 @@ function updateCamera(dt) {
   CAM.pos.z += (tz - CAM.pos.z) * k;
   // shake
   let shx = 0, shy = 0;
-  const shake = snap ? 0 : r.shake + r.chatter * 0.10 + (r.skid > 0.5 ? (r.skid - 0.5) * 0.05 : 0);
+  const shake = snap ? 0 : r.shake * 0.5 + r.chatter * 0.03 + (r.skid > 0.6 ? (r.skid - 0.6) * 0.025 : 0);
   if (shake > 0.001) {
-    CAM.shakeT += dt * 42;
-    shx = Math.sin(CAM.shakeT * 1.7) * shake * 0.26 * zm;
-    shy = Math.sin(CAM.shakeT * 2.3 + 1.1) * shake * 0.20 * zm;
+    CAM.shakeT += dt * 28;
+    shx = Math.sin(CAM.shakeT * 1.4) * shake * 0.18 * zm;
+    shy = Math.sin(CAM.shakeT * 1.9 + 1.1) * shake * 0.14 * zm;
   }
-  G.cam.position.set(CAM.pos.x + shx, CAM.pos.y + shy + r.bump * -0.25 * zm, CAM.pos.z);
+  G.cam.position.set(CAM.pos.x + shx, CAM.pos.y + shy + r.bump * -0.16 * zm, CAM.pos.z);
   const la = (9 + spN * 12) * (1 - 0.18 * vf.p - 0.10 * vf.s) * zm;
-  // a tall screen wastes its top half on sky: aim lower so the rider rides
-  // nearer the middle of the frame and the mountain fills it
-  CAM.look.set(p.x + sy * la * 0.55, p.y + (1.4 + spN * 0.8) * zm - 1.6 * vf.p - 0.5 * vf.s, p.z + cy * la * 0.55);
+  const lx = p.x + sy * la * 0.55;
+  const ly = p.y + (1.4 + spN * 0.8) * zm - 1.6 * vf.p - 0.5 * vf.s;
+  const lz = p.z + cy * la * 0.55;
+  const lk = snap ? 1 : 1 - Math.exp(-10 * dt);
+  CAM.look.x += (lx - CAM.look.x) * lk;
+  CAM.look.y += (ly - CAM.look.y) * lk;
+  CAM.look.z += (lz - CAM.look.z) * lk;
   G.cam.up.set(0, 1, 0);
   G.cam.lookAt(CAM.look);
   // roll into the turn
@@ -377,3 +385,4 @@ function updateCamera(dt) {
     G.cam.fov = CAM.fov; G.cam.updateProjectionMatrix();
   }
 }
+

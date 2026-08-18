@@ -88,13 +88,13 @@ function initRender() {
        near-frontal sun was the flattest light possible: it put almost no shadow
        on the piste, which is why the snow read as a white sheet at any exposure.
        Grazing light rakes every drift and throws tree shadows across the run. */
-    uSun: { value: new THREE.Vector3(0.62, 0.28, 0.73).normalize() },
+    uSun: { value: new THREE.Vector3(0.70, 0.22, 0.68).normalize() },
     /* a 16 deg sun has travelled through much more atmosphere: warmer, dimmer */
-    uSunCol: { value: new THREE.Color(1.55, 1.22, 0.86) },
-    uSkyCol: { value: new THREE.Color(0.26, 0.42, 0.74) },
-    uGndCol: { value: new THREE.Color(0.36, 0.39, 0.44) },
-    uFogA: { value: new THREE.Color(0.50, 0.665, 0.95) },
-    uFogB: { value: new THREE.Color(1.06, 0.97, 0.84) },
+    uSunCol: { value: new THREE.Color(1.68, 1.16, 0.72) },
+    uSkyCol: { value: new THREE.Color(0.28, 0.40, 0.70) },
+    uGndCol: { value: new THREE.Color(0.42, 0.40, 0.40) },
+    uFogA: { value: new THREE.Color(0.62, 0.64, 0.86) },
+    uFogB: { value: new THREE.Color(1.14, 0.90, 0.68) },
     /* the baked sky, so applyFog()'s far clamp can fade the far field into the
        actual backdrop instead of a constant. Filled in right after `new Sky`
        below; every material shallow-copies WU, so they share this {value}
@@ -299,7 +299,8 @@ function frameBody(now) {
   // dbg.fixdt pins the timestep so a slow test machine still exercises the
   // frame-rate-dependent paths (camera springs) exactly as a 60fps device does
   const raw = nowS - lastT;
-  let dt = G.dbg.fixdt || Math.min(raw, 0.25);
+  let dt = G.dbg.fixdt || Math.min(Math.max(raw, 0), 0.08);
+  if (!lastT) dt = 1 / 60;
   lastT = nowS;
   if (document.hidden) return;
   /* A lost context cannot draw, so DO NOT advance the sim or the audio either -
@@ -687,4 +688,5 @@ function boot() {
 }
 window.FL = G;
 boot();
+
 

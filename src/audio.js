@@ -86,6 +86,8 @@ function initAudio() {
   };
   AU.carve = layer(AU.white, 'bandpass', 900, 2.2, 0);
   AU.carve2 = layer(AU.white, 'highpass', 2600, 0.7, 0);
+  AU.crunch = layer(AU.pink, 'bandpass', 680, 3.4, 0);
+  AU.crunchH = layer(AU.white, 'bandpass', 1650, 5.5, 0);
   AU.skid = layer(AU.white, 'bandpass', 2200, 0.8, 0);
   AU.powd = layer(AU.pink, 'lowpass', 700, 1.0, 0);
   AU.wind = layer(AU.pink, 'lowpass', 420, 0.9, 0);
@@ -142,12 +144,32 @@ const SFX = {
     const onSnow = !air && r.state === 'ride';
     const gr = r.grinding ? 1 : 0;
     const ice = r.surf.ice, pw = r.surf.pow;
-    set(AU.carve, onSnow ? (0.10 + 0.55 * spn) * (0.35 + 0.65 * Math.abs(r.edge)) * (1 - gr) * (1 - pw * 0.4) : 0,
-      420 + sp * 55 + Math.abs(r.edge) * 700);
-    AU.carve.f.Q.value = 1.4 + Math.abs(r.edge) * 7 + ice * 5;
-    set(AU.carve2, onSnow ? (0.05 + 0.22 * spn) * (0.25 + 0.75 * ice) * (1 - gr) : 0, 2200 + sp * 120);
-    set(AU.skid, onSnow ? clamp(r.skid, 0, 1.3) * 0.42 * (0.4 + 0.6 * spn) * (1 - gr) : 0, 1500 + sp * 40 + r.skid * 900);
-    set(AU.powd, onSnow ? pw * (0.12 + 0.5 * spn) * (1 - gr) : 0, 500 + sp * 30);
+    const ae = Math.abs(r.edge || 0);
+    const cut = onSnow ? (1 - gr) : 0;
+    set(AU.carve, cut * (0.16 + 0.72 * spn) * (0.28 + 0.72 * ae) * (1 - pw * 0.28),
+      380 + sp * 48 + ae * 820);
+    AU.carve.f.Q.value = 1.6 + ae * 8 + ice * 6;
+    set(AU.carve2, cut * (0.08 + 0.30 * spn) * (0.20 + 0.80 * ice), 2100 + sp * 130);
+    /* packed-snow crunch bed: mid thumps + high ice crystals */
+    set(AU.crunch, cut * (0.10 + 0.48 * spn) * (0.40 + 0.60 * ae) * (0.45 + 0.55 * (1 - pw)),
+      520 + sp * 22 + ae * 380);
+    AU.crunch.f.Q.value = 2.4 + ae * 4;
+    set(AU.crunchH, cut * (0.05 + 0.22 * spn) * (0.25 + 0.75 * ae) * (0.35 + 0.65 * ice),
+      1400 + sp * 70 + ae * 600);
+    set(AU.skid, onSnow ? clamp(r.skid, 0, 1.3) * 0.50 * (0.4 + 0.6 * spn) * (1 - gr) : 0, 1500 + sp * 40 + r.skid * 900);
+    set(AU.powd, onSnow ? pw * (0.16 + 0.62 * spn) * (1 - gr) : 0, 460 + sp * 28);
+    /* granular crunch grains — rate tracks speed * edge so a carve chatters */
+    this._crT = (this._crT || 0) + dt * cut * (1.6 + spn * 11) * (0.22 + ae);
+    while (this._crT > 1) {
+      this._crT -= 0.72 + Math.random() * 0.55;
+      const gv = (0.07 + 0.16 * spn) * (0.35 + 0.65 * ae) * gs;
+      noise(t, 0.045 + Math.random() * 0.04, gv, 'bandpass',
+        620 + Math.random() * 1400, 4.5 + Math.random() * 4);
+      if (ae > 0.45 && Math.random() < 0.45)
+        noise(t, 0.03, gv * 0.7, 'highpass', 2400 + Math.random() * 1800, 3.2);
+    }
+    if (typeof CLOTH_U !== 'undefined')
+      CLOTH_U.value.set(clamp(sp / 28, 0, 1.35), r.edge || 0, air ? 1 : 0);
     /* Wind used to be the loudest thing in the game by a wide margin. It rode
        `spn`, which is clamped at 1.4, on a SQUARED curve: 0.035+0.4*1.96 = 0.82
        on the ground and 1.11 in the air - a full-scale pink-noise bed, which
@@ -226,3 +248,4 @@ const SFX = {
     noise(t, 0.7, 0.10, 'bandpass', 900, 0.8, AU.verb, 3200);
   }
 };
+

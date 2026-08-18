@@ -292,8 +292,8 @@ function riderPalette(jacket, seed) {
     jacket: jc,
     jacketD: mul(jc, 0.62),
     jacketL: [Math.min(1, jc[0] * 1.18 + 0.05), Math.min(1, jc[1] * 1.18 + 0.05), Math.min(1, jc[2] * 1.18 + 0.06)],
-    pants: [0.155, 0.175, 0.245],
-    pantsD: [0.105, 0.12, 0.175],
+    pants: [0.145, 0.185, 0.295],
+    pantsD: [0.092, 0.118, 0.205],
     boot: [0.048, 0.052, 0.066],
     bootSole: [0.088, 0.093, 0.108],
     bindBase: [0.200, 0.215, 0.260],
@@ -452,7 +452,8 @@ function boardSweep(buf, mat, pal, boardBone) {
       const col = up ? (stripe ? pal.jacketL : pal.board) : (down ? pal.base : pal.metal);
       v.set(px, y + py, z);
       n.set(px / (w * w), py / (th * th) * 0.25, 0).normalize();
-      buf.vert(v, n, col, NEUTRAL_UV, boardBone);
+      const uv = up ? [0.5 + 0.46 * (px / Math.max(w, 0.001)), 0.5 + 0.48 * t] : NEUTRAL_UV;
+      buf.vert(v, n, col, uv, boardBone);
     }
     rings.push(start);
   }
@@ -543,40 +544,93 @@ function boardSweep(buf, mat, pal, boardBone) {
 let _FAB = null;
 function fabricTex() {
   if (_FAB) return _FAB;
-  const N = 256, c = document.createElement('canvas'); c.width = c.height = N;
+  const N = 512, c = document.createElement('canvas'); c.width = c.height = N;
   const x = c.getContext('2d');
-  x.fillStyle = '#808080'; x.fillRect(0, 0, N, N);
+  x.fillStyle = '#7a7d82'; x.fillRect(0, 0, N, N);
   const rnd = mulberry32(7);
-  // twill weave: two crossing families of short strokes
-  for (let pass = 0; pass < 2; pass++) {
-    x.lineWidth = 1;
-    for (let i = 0; i < N * 2.2; i++) {
-      const gx = rnd() * N, gy = rnd() * N, l = 3 + rnd() * 7;
-      const v = 128 + (rnd() * 2 - 1) * 26;
-      x.strokeStyle = `rgb(${v | 0},${v | 0},${v | 0})`;
-      x.beginPath(); x.moveTo(gx, gy);
-      x.lineTo(gx + (pass ? l : -l) * 0.7, gy + l * 0.7); x.stroke();
-    }
+  // ripstop diamonds
+  x.strokeStyle = 'rgba(255,255,255,.11)'; x.lineWidth = 1;
+  for (let i = -N; i < N * 2; i += 18) {
+    x.beginPath(); x.moveTo(i, 0); x.lineTo(i + N, N); x.stroke();
+    x.beginPath(); x.moveTo(i, N); x.lineTo(i + N, 0); x.stroke();
   }
-  // quilt panel seams (horizontal channels, like a puffer)
-  x.strokeStyle = 'rgba(70,74,84,.42)'; x.lineWidth = 2.8;
-  for (let i = 0; i < 7; i++) {
-    const y = (i + 0.5) * N / 7;
-    x.beginPath();
-    for (let px = 0; px <= N; px += 4) x.lineTo(px, y + Math.sin(px * 0.08 + i) * 1.6);
-    x.stroke();
+  // crinkled nylon grain
+  const img = x.getImageData(0, 0, N, N), d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const n = (rnd() * 2 - 1) * 22;
+    d[i] = clamp(d[i] + n, 0, 255);
+    d[i + 1] = clamp(d[i + 1] + n, 0, 255);
+    d[i + 2] = clamp(d[i + 2] + n * 0.9, 0, 255);
   }
-  x.strokeStyle = 'rgba(255,255,255,.11)'; x.lineWidth = 2.6;
-  for (let i = 0; i < 7; i++) {
-    const y = (i + 0.5) * N / 7 + 3;
-    x.beginPath();
-    for (let px = 0; px <= N; px += 4) x.lineTo(px, y + Math.sin(px * 0.08 + i) * 1.6);
-    x.stroke();
+  x.putImageData(img, 0, 0);
+  // taped seams
+  x.strokeStyle = 'rgba(18,20,24,.28)'; x.lineWidth = 3;
+  x.beginPath(); x.moveTo(0, N * 0.33); x.lineTo(N, N * 0.33); x.stroke();
+  x.beginPath(); x.moveTo(N * 0.5, 0); x.lineTo(N * 0.5, N); x.stroke();
+  x.fillStyle = 'rgba(255,255,255,.08)';
+  x.fillRect(0, N * 0.18, N, N * 0.09);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  _FAB = t;
+  return t;
+}
+
+function pantsCanvas() {
+  const N = 512, c = document.createElement('canvas'); c.width = c.height = N;
+  const x = c.getContext('2d');
+  x.fillStyle = '#6a6c70'; x.fillRect(0, 0, N, N);
+  const rnd = mulberry32(11);
+  x.lineWidth = 1.2;
+  for (let i = 0; i < N * 3; i++) {
+    const gx = rnd() * N, gy = rnd() * N, l = 5 + rnd() * 10;
+    const v = 108 + (rnd() * 2 - 1) * 20;
+    x.strokeStyle = `rgb(${v | 0},${(v * 0.98) | 0},${(v * 0.94) | 0})`;
+    x.beginPath(); x.moveTo(gx, gy); x.lineTo(gx + l, gy + l * 0.45); x.stroke();
+  }
+  x.strokeStyle = 'rgba(255,255,255,.07)';
+  for (let i = 0; i < 10; i++) {
+    const a = (i + 0.5) * N / 10;
+    x.beginPath(); x.moveTo(0, a); x.lineTo(N, a); x.stroke();
   }
   const t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
-  _FAB = t;
+  t.anisotropy = 8;
   return t;
 }
+
+function loadGameTex(url, wrapRepeat, fallback) {
+  /* Start on the procedural canvas so a single-file build (no /tex) still
+     looks right. If a hosted jpg loads, swap it in. */
+  const t = fallback ? fallback() : new THREE.Texture();
+  t.wrapS = t.wrapT = wrapRepeat ? THREE.RepeatWrapping : THREE.ClampToEdgeWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  t.minFilter = THREE.LinearMipmapLinearFilter;
+  t.magFilter = THREE.LinearFilter;
+  t.generateMipmaps = true;
+  if (!url) return t;
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    if (!img.naturalWidth) return;
+    t.image = img;
+    t.needsUpdate = true;
+  };
+  img.onerror = () => {};
+  img.src = url;
+  return t;
+}
+
+const _GTEX = {};
+function gameTex(name) {
+  if (_GTEX[name]) return _GTEX[name];
+  if (name === 'jacket') _GTEX[name] = loadGameTex('/tex/jacket.jpg', true, fabricTex);
+  else if (name === 'pants') _GTEX[name] = loadGameTex('/tex/pants.jpg', true, pantsCanvas);
+  else if (name === 'boots') _GTEX[name] = loadGameTex('/tex/boots.jpg', true, fabricTex);
+  else if (name === 'board') _GTEX[name] = loadGameTex('/tex/board.jpg', false, fabricTex);
+  return _GTEX[name];
+}
+

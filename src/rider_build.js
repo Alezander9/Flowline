@@ -37,16 +37,16 @@ function buildRiderB(rig, pal) {
     pts: torsoPts, R: 22, ref: hipAx, refFn: twist, col: pal.jacket,
     uvw: 2.0, uvv0: 0, uvv1: 1.15, dome0: 0.14, dome1: 0.10,
     prof: [
-      [0.00, 0.190, 0.110, 0.16, pal.jacketD],   // drawcord hem band
-      [0.035, 0.202, 0.118, 0.15, pal.jacketD],
-      [0.09, 0.198, 0.117, 0.16, pal.jacket],    // bell, sits over the hips
-      [0.19, 0.178, 0.112, 0.20, pal.jacket],
-      [0.34, 0.156, 0.104, 0.28, pal.jacket],
-      [0.54, 0.152, 0.108, 0.28, pal.jacket],
-      [0.72, 0.170, 0.120, 0.30, pal.jacket],
-      [0.86, 0.186, 0.128, 0.46, pal.jacket],
-      [0.95, 0.148, 0.112, 0.34, pal.jacket],
-      [1.00, 0.108, 0.098, 0.28, pal.jacketD],
+      [0.00, 0.168, 0.100, 0.18, pal.jacketD],   // hem sits on the hips, not a bell
+      [0.035, 0.172, 0.104, 0.16, pal.jacketD],
+      [0.09, 0.166, 0.102, 0.18, pal.jacket],
+      [0.19, 0.148, 0.096, 0.22, pal.jacket],
+      [0.34, 0.132, 0.088, 0.30, pal.jacket],    // cinched waist
+      [0.54, 0.138, 0.092, 0.28, pal.jacket],
+      [0.72, 0.146, 0.096, 0.26, pal.jacket],    // athletic chest, not pads
+      [0.86, 0.148, 0.098, 0.32, pal.jacket],    // shoulders: slim, SSX/1080 build
+      [0.95, 0.118, 0.088, 0.28, pal.jacket],
+      [1.00, 0.092, 0.082, 0.24, pal.jacketD],
     ]
   });
   /* shoulder caps: the deltoid dome has to be WIDER than the sleeve's first
@@ -55,9 +55,9 @@ function buildRiderB(rig, pal) {
      blends into the torso as well. */
   for (const [sh, reg] of [[P.upperF, REG.ARMF], [P.upperB, REG.ARMB]]) {
     soft.reg = reg;
-    const inw = sh.clone().sub(P.chest).normalize().multiplyScalar(-0.014);
-    const c = sh.clone().add(inw).add(V3(0, 0.010, 0));
-    soft.addGeo(ico(0.103, 3), new THREE.Matrix4().makeTranslation(c.x, c.y, c.z),
+    const inw = sh.clone().sub(P.chest).normalize().multiplyScalar(-0.028);
+    const c = sh.clone().add(inw).add(V3(0, 0.004, 0));
+    soft.addGeo(ico(0.056, 3), new THREE.Matrix4().makeTranslation(c.x, c.y, c.z),
       pal.jacket, undefined, [0.35, 0.6]);
   }
   // zip placket + chest pocket + hem cord, on the chest front
@@ -68,13 +68,13 @@ function buildRiderB(rig, pal) {
     m.setPosition(pos.x, pos.y, pos.z);
     return buf.addGeo(g, m, col, hint, [0.42, 0.35]);
   };
-  put(soft, roundBox(0.028, 0.30, 0.03, 0.012, 6), pal.jacketD,
-    P.chest.clone().addScaledVector(front, 0.118).add(V3(0, -0.06, 0)));
-  put(soft, roundBox(0.10, 0.062, 0.05, 0.02, 6), pal.jacketD,
-    P.chest.clone().addScaledVector(front, 0.098).addScaledVector(shoulderAx, 0.075).add(V3(0, -0.11, 0)));
+  put(soft, roundBox(0.022, 0.26, 0.022, 0.010, 6), pal.jacketD,
+    P.chest.clone().addScaledVector(front, 0.102).add(V3(0, -0.05, 0)));
+  put(soft, roundBox(0.078, 0.050, 0.036, 0.016, 6), pal.jacketD,
+    P.chest.clone().addScaledVector(front, 0.086).addScaledVector(shoulderAx, 0.062).add(V3(0, -0.10, 0)));
   // hood bundled behind the collar
-  put(soft, roundBox(0.196, 0.086, 0.104, 0.042, 12), pal.jacketD,
-    P.neck.clone().addScaledVector(front, -0.076).add(V3(0, -0.076, 0)));
+  put(soft, roundBox(0.138, 0.062, 0.078, 0.032, 12), pal.jacketD,
+    P.neck.clone().addScaledVector(front, -0.062).add(V3(0, -0.058, 0)));
 
   /* ------------- sleeves and pants: ONE continuous path per limb ---------
      A single swept path from shoulder (or hip) to the wrist (or boot) means
@@ -97,14 +97,14 @@ function buildRiderB(rig, pal) {
       // hand bone, else a wrist rotation swings them out of the rigid mitt
       hintFn: t => t > 0.925 ? hbi : null,
       prof: [
-        [0.00, 0.092, 0.092, 0.22, pal.jacket],
-        [0.16, 0.083, 0.083, 0.18, pal.jacket],
-        [0.36, 0.074, 0.075, 0.16, pal.jacket],
-        [0.50, 0.072, 0.074, 0.20, pal.jacket],   // elbow
-        [0.64, 0.067, 0.068, 0.16, pal.jacket],
-        [0.86, 0.059, 0.060, 0.18, pal.jacket],
-        [0.94, 0.052, 0.053, 0.24, pal.jacketD],  // cuff band, tapering: the
-        [1.00, 0.042, 0.043, 0.34, pal.jacketD],  // mitt gauntlet covers it
+        [0.00, 0.062, 0.062, 0.20, pal.jacket],
+        [0.16, 0.056, 0.056, 0.16, pal.jacket],
+        [0.36, 0.050, 0.051, 0.14, pal.jacket],
+        [0.50, 0.052, 0.053, 0.18, pal.jacket],   // elbow
+        [0.64, 0.048, 0.049, 0.14, pal.jacket],
+        [0.86, 0.044, 0.045, 0.16, pal.jacket],
+        [0.94, 0.040, 0.041, 0.22, pal.jacketD],
+        [1.00, 0.036, 0.037, 0.30, pal.jacketD],
       ]
     });
   };
@@ -130,17 +130,17 @@ function buildRiderB(rig, pal) {
       // the hem sits around the rigid boot: pin it to the foot bone as well
       hintFn: t2 => t2 > 0.945 ? fbi : null,
       prof: [
-        [0.00, 0.092, 0.100, 0.32, pal.pants],
-        [0.14, 0.095, 0.103, 0.26, pal.pants],
-        [0.34, 0.095, 0.102, 0.22, pal.pants],
-        [0.52, 0.094, 0.102, 0.22, pal.pants],
-        [0.60, 0.095, 0.105, 0.26, pal.pants],   // crease above the knee
-        [0.64, 0.098, 0.111, 0.36, pal.pants],   // kneepad
-        [0.68, 0.094, 0.105, 0.28, pal.pants],   // crease below
-        [0.76, 0.094, 0.104, 0.24, pal.pants],
-        [0.86, 0.093, 0.101, 0.24, pal.pants],
-        [0.92, 0.095, 0.101, 0.30, pal.pantsD],  // gaiter over the boot cuff
-        [1.00, 0.088, 0.092, 0.44, pal.pantsD],
+        [0.00, 0.100, 0.112, 0.34, pal.pants],
+        [0.14, 0.108, 0.118, 0.28, pal.pants],   // baggy SSX thigh
+        [0.34, 0.110, 0.120, 0.24, pal.pants],
+        [0.52, 0.108, 0.118, 0.24, pal.pants],
+        [0.60, 0.106, 0.116, 0.28, pal.pants],
+        [0.64, 0.108, 0.122, 0.36, pal.pants],   // kneepad
+        [0.68, 0.100, 0.112, 0.28, pal.pants],
+        [0.76, 0.096, 0.108, 0.24, pal.pants],
+        [0.86, 0.090, 0.100, 0.24, pal.pants],
+        [0.92, 0.088, 0.096, 0.30, pal.pantsD],
+        [1.00, 0.082, 0.088, 0.42, pal.pantsD],
       ]
     });
   };
@@ -341,3 +341,4 @@ function buildRiderB(rig, pal) {
 
   return { soft, hard };
 }
+

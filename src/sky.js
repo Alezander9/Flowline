@@ -129,22 +129,22 @@ float rgeH(vec2 w){
   float d1    = rg(q*2.9 + vec2(11.2,4.5));   // ~2.4 km ridges
   float d2    = rg(q*7.7 + vec2(3.4,19.1));   // ~900 m spurs
   float d3    = fb(q*21.0 + vec2(7.1,2.2));   // ~330 m roughness
-  float s = chain*0.46 + d1*0.32 + d2*0.22 + d3*0.09;
-  s = pow(clamp(s, 0.0, 1.6), 2.0);           // sharpen crests into real peaks
+  float s = chain*0.38 + d1*0.30 + d2*0.28 + d3*0.14;
+  s = pow(clamp(s, 0.0, 1.7), 1.82);          // sharper alpine horns, still massy
   float r = length(w);
   /* the near field must stay a valley: a peak 1 km from the camera would tower
      over everything and the game's own terrain already owns that ground */
-  float nf = smoothstep(1100.0, 5200.0, r);
+  float nf = smoothstep(1100.0, 4800.0, r);
   /* far ranges stand taller or they never clear the near ones */
-  float amp = mix(2900.0, 5000.0, clamp((r-4000.0)/26000.0, 0.0, 1.0));
-  return -720.0 + s*amp*nf;
+  float amp = mix(3400.0, 6200.0, clamp((r-3600.0)/24000.0, 0.0, 1.0));
+  return -640.0 + s*amp*nf;
 }
 
 /* equirect direction -> sky radiance, for the ranges' aerial perspective. Must
    track the sky quad's own gradient or the ranges will not melt into it. */
 vec3 hazeCol(vec3 d, vec3 sun){
-  vec3 c = mix(vec3(0.62,0.80,0.99), vec3(0.07,0.30,0.88), pow(clamp(d.y,0.0,1.0),0.62));
-  return mix(c, vec3(1.02,0.96,0.86), pow(max(dot(d,sun),0.0),3.0)*0.40);
+  vec3 c = mix(vec3(0.80,0.76,0.86), vec3(0.09,0.28,0.82), pow(clamp(d.y,0.0,1.0),0.70));
+  return mix(c, vec3(1.10,0.88,0.62), pow(max(dot(d,sun),0.0),2.6)*0.52);
 }
 `;
 
@@ -166,16 +166,15 @@ void main(){
   float up = clamp(d.y*0.5+0.5,0.0,1.0);
 
   // ---- sky gradient
-  vec3 zen = vec3(0.07,0.30,0.88);
-  vec3 hor = vec3(0.62,0.80,0.99);
-  vec3 col = mix(hor, zen, pow(clamp(d.y,0.0,1.0), 0.62));
+  vec3 zen = vec3(0.09,0.28,0.82);
+  vec3 hor = vec3(0.82,0.78,0.88);
+  vec3 col = mix(hor, zen, pow(clamp(d.y,0.0,1.0), 0.70));
   float sd = max(dot(d,sun),0.0);
-  /* a 90-deg-wide halo was fine when the bake clamped to [0,1]; in HDR it pushes
-     a huge patch of sky past 1.0, where it clips to flat white. Tighten it. */
-  col += vec3(1.25,1.02,0.72)*pow(sd,13.0)*0.30;
-  col += vec3(1.0,0.86,0.62)*pow(sd,60.0)*1.2;
-  col += vec3(1.6,1.45,1.15)*smoothstep(0.9985,0.9995,sd)*9.0;
-  col = mix(col, vec3(1.05,0.99,0.90), pow(1.0-up,7.0)*0.75);
+  /* SSX golden-hour wash: a wide warm halo, tight sun disc, peach horizon */
+  col += vec3(1.35,0.92,0.55)*pow(sd,9.0)*0.42;
+  col += vec3(1.15,0.82,0.48)*pow(sd,42.0)*1.35;
+  col += vec3(1.7,1.35,0.95)*smoothstep(0.9982,0.9996,sd)*10.0;
+  col = mix(col, vec3(1.12,0.86,0.62), pow(1.0-up,5.5)*0.88);
 
   // ---- clouds
   if(d.y > 0.012){
@@ -563,3 +562,4 @@ class Sky {
 
   }
 }
+
