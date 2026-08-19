@@ -320,7 +320,10 @@ function frameBody(now) {
      its way out of it either: you need a live frame to reach the pause menu to
      undo it. (?lq is the only escape and no player knows it.) A pin is a CEILING
      now, so this can always pull the tier down; only promotion respects it. */
-  if (raw > 0.4 && !G.dbg.fixdt && !G.dbg.lockQ && G.q.lvl > 0) {
+  /* !document.hidden: a hidden tab is throttled to ~1fps, so EVERY frame in it
+     trips this 0.4s test. Without this guard, backgrounding the tab for a moment
+     demoted the run to tier 0 and it could only climb back one rung at a time. */
+  if (raw > 0.4 && !document.hidden && !G.dbg.fixdt && !G.dbg.lockQ && G.q.lvl > 0) {
     setQuality(raw > 1.0 ? 0 : G.q.lvl - 1);
     qCool = 8; qUp = 0;
   }
@@ -413,8 +416,33 @@ function setQuality(lvl) {
      i.e. the control lied about the very thing a player opens it to check. */
   if (typeof UI !== 'undefined' && UI.show_cycGfx) UI.show_cycGfx();
 }
-let qCool = 6, qUp = 0;
+let qCool = 6, qUp = 0, qBoot = 0;
 function autoQuality() {
+  /* A BACKGROUND TAB IS NOT A SLOW GPU. requestAnimationFrame is throttled to
+     ~1fps in a hidden tab, so every fps-based verdict here is meaningless while
+     hidden - and acting on it is actively harmful: a boot in a background tab
+     read as a hopeless machine, demoted to tier 0, and because promotion then
+     climbs one rung at a time the player who switched to the tab got a
+     permanently degraded run. MEASURED on an Intel Arc laptop that holds tier 3
+     at a locked 60fps. Do nothing until we can actually see the frames. */
+  if (document.hidden) return;
+  /* ONE-SHOT JUMP TO HIGH. The BOOT TIER literal is deliberately cheap because
+     full pixel ratio DURING the one-off startup bakes froze weak iGPUs ~1s in.
+     That protection only ever needed to cover the bakes - but the promote ladder
+     below then took ~28s to reach tier 3 (qCool 14 windows = 7s, plus qUp, per
+     rung), so a machine that can hold HIGH at 60fps spent its first half-minute
+     at 0.75 pixel ratio with no deform and no surface detail. This takes it to
+     HIGH in one step instead, after 4 fps windows (~2s), by which point the
+     bakes are done and G.fps finally means something. A machine that is NOT
+     coping fails the fps test, never takes the jump, and is left to the ladder
+     and the emergency demote exactly as before - so this cannot brick a weak
+     device, it only stops punishing a strong one. */
+  if (qBoot < 9 && ++qBoot === 4) {
+    qBoot = 9;
+    if (G.fps > 45 && G.q.lvl < 3 && !G.gpuReset && !G.dbg.lockQ && G.qPin === null) {
+      setQuality(3); qCool = 8; qUp = 0; return;
+    }
+  }
   qCool--;
   if (qCool > 0 || G.dbg.lockQ) return;
   /* A pinned tier is a CEILING, not a lock: demotion stays available at every

@@ -50,10 +50,14 @@ const GFX_STEPS = [['auto', 'AUTO'], [0, 'LOW'], [2, 'MEDIUM'], [3, 'HIGH']];
 /* Every INTERNAL tier needs a name, including rung 1, because AUTO reports the
    tier it has settled on and a pin reports where the safety net has landed. */
 const TIER_NAME = ['LOW', 'MID', 'MEDIUM', 'HIGH'];
-/* A build from before the merge could have stored gfx: 1, which is no longer an
-   offered step. Left alone it would pin tier 1 while the button displayed AUTO,
-   so the control would lie about what it was doing. */
-if (OPT.gfx !== 'auto' && !GFX_STEPS.some(s => s[0] === +OPT.gfx)) OPT.gfx = 'auto';
+/* THE GRAPHICS CONTROL IS GONE (its row is no longer in shell.html), so this is
+   now an unconditional migration rather than a validity check. Any stored pin has
+   to be retired: without a button there is no way for a player to undo one, and a
+   pin persists in localStorage - so somebody who once selected LOW, or whose
+   machine demoted while pinned, would be stranded on it for ever with no UI to
+   escape through. 'auto' hands the tier to autoQuality, which now jumps straight
+   to HIGH on any machine that can hold it. ?lq still forces tier 0 for debugging. */
+OPT.gfx = 'auto';
 
 /* Change the time of day at RUNTIME. This is the expensive path, and it is
    expensive only because three things are BAKED under the sun rather than lit by

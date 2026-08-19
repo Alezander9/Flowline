@@ -393,7 +393,7 @@
     <div class="big">GRAPHICS DRIVER RESET</div>
     <div class="sub">Your graphics driver restarted, so the picture stopped.
       Recovering at the lowest quality&nbsp;… if this screen stays, reload the page.
-      You can pin a lower <em>GRAPHICS</em> setting in the pause menu to stop it happening again.</div>
+      The game will now stay at a safer quality level for the rest of this run.</div>
   </div>
 
   <div id="pause">
@@ -406,7 +406,12 @@
       <div class="set"><span>CAMERA</span><div class="vr"><input type="range" class="vol pe" id="camZoom"
         min="30" max="115" step="1" aria-label="camera distance"><span class="vn" id="camZoomN">60</span></div></div>
       <div class="set"><span>LIGHT</span><div class="cyc pe" id="cycTod">AUTO</div></div>
-      <div class="set"><span>GRAPHICS</span><div class="cyc pe" id="cycGfx">AUTO</div></div>
+      <!-- GRAPHICS row removed: every machine that can hold HIGH now gets it
+           automatically (see the one-shot jump in autoQuality), and a machine that
+           cannot is governed by the emergency demote. ui.js guards on $('cycGfx')
+           so its whole block goes inert with the element gone. -->
+
+
       <div class="set"><span>INVERT CARVE</span><div class="sw pe" id="swInv"><i></i></div></div>
     </div>
     <div style="display:flex;gap:10px"><button class="btn pe" id="resume">RESUME</button>
@@ -12503,10 +12508,14 @@ const GFX_STEPS = [['auto', 'AUTO'], [0, 'LOW'], [2, 'MEDIUM'], [3, 'HIGH']];
 /* Every INTERNAL tier needs a name, including rung 1, because AUTO reports the
    tier it has settled on and a pin reports where the safety net has landed. */
 const TIER_NAME = ['LOW', 'MID', 'MEDIUM', 'HIGH'];
-/* A build from before the merge could have stored gfx: 1, which is no longer an
-   offered step. Left alone it would pin tier 1 while the button displayed AUTO,
-   so the control would lie about what it was doing. */
-if (OPT.gfx !== 'auto' && !GFX_STEPS.some(s => s[0] === +OPT.gfx)) OPT.gfx = 'auto';
+/* THE GRAPHICS CONTROL IS GONE (its row is no longer in shell.html), so this is
+   now an unconditional migration rather than a validity check. Any stored pin has
+   to be retired: without a button there is no way for a player to undo one, and a
+   pin persists in localStorage - so somebody who once selected LOW, or whose
+   machine demoted while pinned, would be stranded on it for ever with no UI to
+   escape through. 'auto' hands the tier to autoQuality, which now jumps straight
+   to HIGH on any machine that can hold it. ?lq still forces tier 0 for debugging. */
+OPT.gfx = 'auto';
 
 /* Change the time of day at RUNTIME. This is the expensive path, and it is
    expensive only because three things are BAKED under the sun rather than lit by
@@ -13356,7 +13365,10 @@ function frameBody(now) {
      its way out of it either: you need a live frame to reach the pause menu to
      undo it. (?lq is the only escape and no player knows it.) A pin is a CEILING
      now, so this can always pull the tier down; only promotion respects it. */
-  if (raw > 0.4 && !G.dbg.fixdt && !G.dbg.lockQ && G.q.lvl > 0) {
+  /* !document.hidden: a hidden tab is throttled to ~1fps, so EVERY frame in it
+     trips this 0.4s test. Without this guard, backgrounding the tab for a moment
+     demoted the run to tier 0 and it could only climb back one rung at a time. */
+  if (raw > 0.4 && !document.hidden && !G.dbg.fixdt && !G.dbg.lockQ && G.q.lvl > 0) {
     setQuality(raw > 1.0 ? 0 : G.q.lvl - 1);
     qCool = 8; qUp = 0;
   }
@@ -13449,8 +13461,33 @@ function setQuality(lvl) {
      i.e. the control lied about the very thing a player opens it to check. */
   if (typeof UI !== 'undefined' && UI.show_cycGfx) UI.show_cycGfx();
 }
-let qCool = 6, qUp = 0;
+let qCool = 6, qUp = 0, qBoot = 0;
 function autoQuality() {
+  /* A BACKGROUND TAB IS NOT A SLOW GPU. requestAnimationFrame is throttled to
+     ~1fps in a hidden tab, so every fps-based verdict here is meaningless while
+     hidden - and acting on it is actively harmful: a boot in a background tab
+     read as a hopeless machine, demoted to tier 0, and because promotion then
+     climbs one rung at a time the player who switched to the tab got a
+     permanently degraded run. MEASURED on an Intel Arc laptop that holds tier 3
+     at a locked 60fps. Do nothing until we can actually see the frames. */
+  if (document.hidden) return;
+  /* ONE-SHOT JUMP TO HIGH. The BOOT TIER literal is deliberately cheap because
+     full pixel ratio DURING the one-off startup bakes froze weak iGPUs ~1s in.
+     That protection only ever needed to cover the bakes - but the promote ladder
+     below then took ~28s to reach tier 3 (qCool 14 windows = 7s, plus qUp, per
+     rung), so a machine that can hold HIGH at 60fps spent its first half-minute
+     at 0.75 pixel ratio with no deform and no surface detail. This takes it to
+     HIGH in one step instead, after 4 fps windows (~2s), by which point the
+     bakes are done and G.fps finally means something. A machine that is NOT
+     coping fails the fps test, never takes the jump, and is left to the ladder
+     and the emergency demote exactly as before - so this cannot brick a weak
+     device, it only stops punishing a strong one. */
+  if (qBoot < 9 && ++qBoot === 4) {
+    qBoot = 9;
+    if (G.fps > 45 && G.q.lvl < 3 && !G.gpuReset && !G.dbg.lockQ && G.qPin === null) {
+      setQuality(3); qCool = 8; qUp = 0; return;
+    }
+  }
   qCool--;
   if (qCool > 0 || G.dbg.lockQ) return;
   /* A pinned tier is a CEILING, not a lock: demotion stays available at every

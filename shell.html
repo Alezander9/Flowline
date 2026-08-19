@@ -393,7 +393,7 @@
     <div class="big">GRAPHICS DRIVER RESET</div>
     <div class="sub">Your graphics driver restarted, so the picture stopped.
       Recovering at the lowest quality&nbsp;… if this screen stays, reload the page.
-      You can pin a lower <em>GRAPHICS</em> setting in the pause menu to stop it happening again.</div>
+      The game will now stay at a safer quality level for the rest of this run.</div>
   </div>
 
   <div id="pause">
@@ -406,7 +406,12 @@
       <div class="set"><span>CAMERA</span><div class="vr"><input type="range" class="vol pe" id="camZoom"
         min="30" max="115" step="1" aria-label="camera distance"><span class="vn" id="camZoomN">60</span></div></div>
       <div class="set"><span>LIGHT</span><div class="cyc pe" id="cycTod">AUTO</div></div>
-      <div class="set"><span>GRAPHICS</span><div class="cyc pe" id="cycGfx">AUTO</div></div>
+      <!-- GRAPHICS row removed: every machine that can hold HIGH now gets it
+           automatically (see the one-shot jump in autoQuality), and a machine that
+           cannot is governed by the emergency demote. ui.js guards on $('cycGfx')
+           so its whole block goes inert with the element gone. -->
+
+
       <div class="set"><span>INVERT CARVE</span><div class="sw pe" id="swInv"><i></i></div></div>
     </div>
     <div style="display:flex;gap:10px"><button class="btn pe" id="resume">RESUME</button>
