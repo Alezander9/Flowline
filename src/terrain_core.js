@@ -112,7 +112,7 @@ function rowSetup(z) {
   RC.roll = groomRoll(z);
   RC.bank = clamp(-pisteC2(z) * 520, -0.5, 0.5);
   RC.bias = noise1(z * 0.0016) * 0.85;
-  RC.iceA = smoothstep(0.15, 0.55, noise1(z * 0.0021 + 7.7) + 0.25);
+  RC.iceA = smoothstep(0.42, 0.78, noise1(z * 0.0021 + 7.7) + 0.05) * 0.28;
   RC.fN = 0;
   const s0 = Math.floor(z / SEG);
   for (let s = s0 - 2; s <= s0 + 1; s++) {
@@ -248,7 +248,7 @@ function sampleAt(x, z, res) {
   let ice = 0;
   if (RC.iceA > 0.01) {
     const n = fbm2f(x * 0.021, z * 0.017, res === undefined ? 3 : clamp(3 - (res - 2.6) / 4, 1.4, 3), 3);
-    ice = smoothstep(0.14, 0.42, n) * RC.iceA * (0.35 + 0.65 * corr) * (0.4 + 0.6 * smoothstep(0.24, 0.4, pitchAt(z)));
+    ice = smoothstep(0.38, 0.72, n) * RC.iceA * (0.22 + 0.45 * corr) * (0.25 + 0.45 * smoothstep(0.28, 0.46, pitchAt(z)));
   }
   /* ---------------------------------------------- promoted drift (phase 3)
      The 7.5 m wind-drift octave as REAL height instead of a faked normal.
@@ -334,3 +334,4 @@ function terrainNormal(x, z, eps = 0.8) {
   _nrm.x = nx * il; _nrm.y = il; _nrm.z = nz * il;
   return _nrm;
 }
+

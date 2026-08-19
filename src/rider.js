@@ -33,6 +33,11 @@ class Rider {
     this.p = new THREE.Vector3();
     this.v = new THREE.Vector3();
     this.n = new THREE.Vector3(0, 1, 0);
+    this.pPrev = new THREE.Vector3();
+    this.pDraw = new THREE.Vector3();
+    this.nDraw = new THREE.Vector3(0, 1, 0);
+    this.yawPrev = 0;
+    this.yawDraw = 0;
     this.input = { steer: 0, tuck: 0, pop: false, grab: false };
     this.body = new RiderBody(G.scene, 0xff7a33);
     this.reset();
@@ -92,12 +97,16 @@ class Rider {
     this.vmax = 16; this.speed = 0; this.chatter = 0;
     this.closeT = 0; this.trickTag = '';
     this.stat = { air: 0, grind: 0, close: 0, best: 0 };
+    this.pPrev.copy(this.p); this.pDraw.copy(this.p);
+    this.nDraw.copy(this.n); this.yawPrev = this.yaw; this.yawDraw = this.yaw;
     if (!soft) { this.runT = 0; }
   }
 
   get dist() { return Math.max(0, this.maxZ - this.startZ); }
 
   step(dt) {
+    this.pPrev.copy(this.p);
+    this.yawPrev = this.yaw;
     const inp = this.input;
     if (this.state === 'down') { this.stepDown(dt); return; }
     this.runT += dt;
@@ -108,7 +117,7 @@ class Rider {
     let gh = s.h;
     this.surf.groom = s.groom; this.surf.ice = s.ice; this.surf.pow = s.pow;
     this.surf.solid = s.solid; this.surf.park = s.park; this.surf.kind = s.kind; this.surf.dEdge = s.dEdge;
-    const nn = terrainNormal(p.x, p.z, this.grounded ? 0.9 : 1.6);
+    const nn = terrainNormal(p.x, p.z, this.grounded ? 1.5 : 1.8);
     const n = this.n.set(nn.x, nn.y, nn.z);
 
     /* ---- PB4: building roofs are one-way platforms ----
@@ -498,3 +507,4 @@ const FLIP = { rate: 3.0, accel: 6, clean: 0.175, k: 1.64, kill: 0.785, settle: 
 const LAND = { bigAir: 2.5, grab: 0.35, noPen: 8.33, fullPen: 41.67, penExp: 1.2, sevMax: 1.0 };
 const _tv1 = new THREE.Vector3(), _tv2 = new THREE.Vector3(), _tv3 = new THREE.Vector3();
 const _plat = { h: 0, nx: 0, ny: 1, nz: 0, o: null };
+

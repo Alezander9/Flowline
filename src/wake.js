@@ -32,7 +32,7 @@
 
 const WK_SEG = 2400;           // legacy ring length; kept for the constructor's
                                // signature only - there is no ring to size now
-const WK_STEP = 0.55;          // metres of travel between contact samples
+const WK_STEP = 0.40;          // metres of travel between contact samples
 
 class Wake {
   /* `scene` and `segs` are accepted and ignored: this class no longer builds
@@ -114,7 +114,7 @@ class Wake {
     const pw = num(r.surf && r.surf.pow, 1);   // 0 = groomed hardpack, 1 = deep powder
     const ic = num(r.surf && r.surf.ice, 0);
     const ramp = clamp(this.ramp, 0, 1);
-    const comp = clamp(0.34 + ae * 0.44 + sk * 0.26, 0, 1) * ramp;
+    const comp = clamp(0.62 + ae * 0.32 + sk * 0.22, 0, 1) * ramp;
     /* HOW MUCH SNOW THERE IS TO MOVE. Until now depth ignored the surface
        entirely, so a carve on hardpack cut the same 45 cm trench as one in deep
        powder - and a deep uniform trench on packed snow is precisely what reads
@@ -129,8 +129,8 @@ class Wake {
        at all. The piste read is carried by the compression channel instead -
        albedo AND roughness AND thickness - which SNOW_FRAG already applies from
        DF.z, so nothing is lost by letting the geometry go shallow there. */
-    const soft = (0.12 + 0.88 * pw) * (1.0 - 0.60 * ic);
-    const depth = (0.048 + ae * 0.062 + sk * 0.030) * (0.5 + comp * 0.5) * ramp * soft;
+    const soft = (0.34 + 0.66 * pw) * (1.0 - 0.50 * ic);
+    const depth = (0.092 + ae * 0.078 + sk * 0.042) * (0.58 + comp * 0.42) * ramp * soft;
     /* PUBLISH THE CUT (metres of real rut) so the airborne snow can be driven
        by it. Until now fx.spray carried its OWN idea of how much snow was
        moving - `skid*40 + |edge|*sp*1.45 + pow*sp*1.3` - with no ice term at
@@ -144,7 +144,7 @@ class Wake {
     this.ramp += 0.22;
     /* a locked carve cuts a narrow line; a skid smears a wide one - and the
        board sinks in powder, so the same turn displaces a wider footprint */
-    let hw = (0.26 + sk * 0.30 + ae * 0.08) * (0.86 + 0.70 * pw);
+    let hw = (0.30 + sk * 0.28 + ae * 0.06) * (0.90 + 0.55 * pw);
     /* THE FOOTPRINT IS A HEIGHTFIELD, SO IT MUST BE MEASURED IN WORLD XZ.
        The board's width is fixed ALONG THE SURFACE, but the deformation buffer
        is indexed by world xz, so a constant xz half-width covers width/cos(t)
@@ -183,3 +183,4 @@ class Wake {
      bots call it when a rider retires. */
   dispose() {}
 }
+

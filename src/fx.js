@@ -21,7 +21,7 @@ const PMAX = 4000;
    cloud is a few hundred big overlapping discs at low alpha, feathered all the
    way to the centre, whose density comes from overlap and whose shape comes
    from the shadowed side going dark and blue (see `lit` below). */
-const SPRAY = { k: 1900, d0: 0.015, exp: 2, size: 1, alpha: 1, clod: 0.30, shade: 1 };
+const SPRAY = { k: 2600, d0: 0.012, exp: 1.85, size: 1.22, alpha: 1.12, clod: 0.38, shade: 1.08 };
 class FX {
   constructor(scene) {
     // ---- particle pool
@@ -280,3 +280,4 @@ class FX {
     this.dust.geometry.setDrawRange(0, Math.min(G.q.dust, this.dustN));   // see the note at construction
   }
 }
+

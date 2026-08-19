@@ -157,7 +157,7 @@ class Bot {
       r.surf.pow = gs.pow; r.surf.ice = gs.ice; r.surf.groom = gs.groom;
     }
     r.speed = Math.hypot(r.v.x, r.v.z);
-    r.skid = clamp(Math.abs(r.edge) * 0.8, 0, 1);
+    r.skid = clamp(Math.abs(r.edge) * (k.id === 'carver' || k.id === 'sniper' ? 0.10 : 0.72), 0, 1);
     r.runT = G.t + this.phase;
     if (G.fx && r.grounded && r.speed > 8 && Math.abs(r.edge) > 0.35) {
       const d2 = (p.x - G.rider.p.x) ** 2 + (p.z - G.rider.p.z) ** 2;
@@ -217,3 +217,4 @@ const BOTS = {
     this.list.push(b);
   }
 };
+

@@ -217,9 +217,15 @@ void main(){
   float hw = halfW*(1.0 + chunky*(cn - 0.5)*0.17);
   float d = 0.0, b = 0.0, c = 0.0, ic = 0.0;
   if(lat <= hw){
-    float u = lat/hw;
-    d = depth*(1.0 - u*u*0.35);          // rounded floor, not a slot
-    c = vPar.z; ic = vPar.w;
+    /* Dual-rail snowboard track — two edge grooves + packed mid-sole.
+       Must match stamps.displaceAt exactly. */
+    float railC = hw*0.68;
+    float railW = max(hw*0.26, 0.035);
+    float rail = exp(-pow((lat - railC)/railW, 2.0));
+    float mid  = 1.0 - smoothstep(0.0, railC*0.9, lat);
+    d = depth*(0.28*mid + 1.0*rail);
+    c = vPar.z*(0.52 + 0.48*mid + 0.22*rail);
+    ic = vPar.w;
   } else {
     /* project the berm like halfW already is; max() mirrors the CPU floor so
        a zero attribute can never divide by zero and discard every berm */
@@ -377,3 +383,4 @@ class DeformCascade {
 
   dispose() { for (const l of this.lv) l.rt.dispose(); this.geo.dispose(); this.mat.dispose(); }
 }
+

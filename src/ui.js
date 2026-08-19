@@ -11,7 +11,7 @@ const LS = {
 const OPT = {
   musVol: LS.get('musVol', LS.get('music', true) ? 0.7 : 0),
   sfxVol: LS.get('sfxVol', LS.get('sfx', true) ? 1.0 : 0),
-  camZoom: LS.get('camZoom', 0.6),      // chase-camera scale, see CAMZ in util.js (1 = the old rig)
+  camZoom: LS.get('camZoom', 0.48),      // chase-camera scale, see CAMZ in util.js (1 = the old rig)
   /* `high` is gone. It was a second graphics control that fought the first: this
      file set G.q.detail/G.q.trees from it and then called setQuality, whose
      Object.assign(G.q, QLEVELS[lvl]) overwrote both - so HIGH DETAIL was a dead
@@ -456,3 +456,4 @@ function updateHUD() {
   MU.flow = OPT.music ? r.flow : 0;
   SFX.update(r, G.dt);
 }
+

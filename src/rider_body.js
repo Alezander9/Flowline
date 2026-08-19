@@ -21,22 +21,38 @@ function shadowTex() {
 
 /* objMat's lighting and fog, plus skinning and an optional fabric map. The
    skinning chunks are inert unless the object being drawn is a SkinnedMesh. */
+const CLOTH_U = { value: new THREE.Vector3(0, 0, 0) };   // speed, edge, air
 function riderMat(o = {}) {
+  const cloth = !!o.cloth;
+  const defs = {};
+  if (o.map) defs.HAS_MAP = '';
+  if (o.mapB) defs.HAS_MAP_B = '';
+  if (o.board) defs.HAS_BOARD = '';
+  if (cloth) defs.HAS_CLOTH = '';
   const m = new THREE.ShaderMaterial({
     uniforms: Object.assign({}, WU, {
       uSpec: { value: o.spec ?? 0.0 }, uWrap: { value: o.wrap ?? 0.34 },
       uRim: { value: o.rim ?? 0.0 }, uMap: { value: o.map || null },
+      uMapB: { value: o.mapB || null },
+      uBoard: { value: o.board || null },
       uMapAmt: { value: o.map ? (o.mapAmt ?? 1.0) : 0.0 },
+      uRide: CLOTH_U,
     }),
-    defines: o.map ? { HAS_MAP: '' } : {},
+    defines: defs,
     side: o.side || THREE.FrontSide,
     vertexShader: `
       attribute vec3 color;
-      #ifdef HAS_MAP
+      #if defined(HAS_MAP) || defined(HAS_BOARD)
         attribute vec2 aUv;
         varying vec2 vUv;
       #endif
       varying vec3 vC, vN, vW;
+      #ifdef HAS_CLOTH
+        varying float vWr;
+        varying float vBag;
+      #endif
+      uniform vec3 uRide;
+      uniform float uTime;
       #include <skinning_pars_vertex>
       void main(){
         vec3 objectNormal = normal;
@@ -44,21 +60,42 @@ function riderMat(o = {}) {
         #include <skinbase_vertex>
         #include <skinnormal_vertex>
         #include <skinning_vertex>
+        #ifdef HAS_CLOTH
+          /* Jacket and hem move. Legs stay put — they are a body, not a flag. */
+          float jacket = smoothstep(0.52, 0.64, position.y) * (1.0 - smoothstep(0.96, 1.08, position.y));
+          float hem = smoothstep(0.70, 0.56, position.y) * smoothstep(0.48, 0.56, position.y);
+          float pants = (1.0 - smoothstep(0.40, 0.56, position.y)) * smoothstep(0.18, 0.28, position.y);
+          float loose = jacket * 1.0 + hem * 0.70 + pants * 0.18;
+          float wind = uRide.x * 0.55;
+          float n1 = sin(transformed.x*16.0 + uTime*(2.8+3.4*uRide.x) + transformed.y*6.0);
+          float n2 = sin(transformed.z*12.0 - uTime*(2.1+2.6*uRide.x));
+          float wr = n1*0.62 + n2*0.38;
+          float amp = 0.006 * (0.30 + wind) * loose;
+          transformed += objectNormal * wr * amp;
+          transformed.z += wind * 0.007 * jacket * (0.4 + 0.6*wr);
+          vWr = wr * loose;
+          vBag = pants / max(pants + jacket, 1e-4);
+        #endif
         vec4 wp = modelMatrix * vec4(transformed, 1.0);
         vC = color;
         vN = normalize(mat3(modelMatrix) * objectNormal);
         vW = wp.xyz;
-        #ifdef HAS_MAP
+        #if defined(HAS_MAP) || defined(HAS_BOARD)
           vUv = aUv;
         #endif
         gl_Position = projectionMatrix * viewMatrix * wp;
       }`,
     fragmentShader: GLSL_COMMON + GLSL_CASCADE + `
       uniform float uSpec, uWrap, uRim, uMapAmt;
-      uniform sampler2D uMap;
+      uniform sampler2D uMap, uMapB, uBoard;
+      uniform vec3 uRide;
       varying vec3 vC, vN, vW;
-      #ifdef HAS_MAP
+      #if defined(HAS_MAP) || defined(HAS_BOARD)
         varying vec2 vUv;
+      #endif
+      #ifdef HAS_CLOTH
+        varying float vWr;
+        varying float vBag;
       #endif
       void main(){
         vec3 N = normalize(vN);
@@ -66,17 +103,43 @@ function riderMat(o = {}) {
         float dist = length(vW - cameraPosition);
         vec3 base = vC;
         #ifdef HAS_MAP
-          vec3 tx = texture2D(uMap, vUv).rgb;
-          base *= mix(vec3(1.0), tx*2.0, uMapAmt);
+          vec2 uv = vUv;
+          #ifdef HAS_CLOTH
+            uv += vec2(vWr, -vWr)*0.020*(0.4+uRide.x);
+          #endif
+          vec3 tx = texture2D(uMap, uv).rgb;
+          #ifdef HAS_MAP_B
+            vec3 txP = texture2D(uMapB, uv*1.15).rgb;
+            tx = mix(tx, txP, vBag);
+          #endif
+          base *= mix(vec3(1.0), tx*1.85, uMapAmt);
+          float dlt = 0.004;
+          float hL = texture2D(uMap, uv-vec2(dlt,0.0)).g;
+          float hR = texture2D(uMap, uv+vec2(dlt,0.0)).g;
+          float hD = texture2D(uMap, uv-vec2(0.0,dlt)).g;
+          float hU = texture2D(uMap, uv+vec2(0.0,dlt)).g;
+          N = normalize(N + vec3(hL-hR, 0.0, hD-hU)*1.15);
+        #endif
+        #ifdef HAS_BOARD
+          float boardM = step(0.055, abs(vUv.x-0.5)+abs(vUv.y-0.5));
+          vec3 bd = texture2D(uBoard, vUv).rgb;
+          base = mix(base, bd, boardM*0.92);
+        #endif
+        #ifdef HAS_CLOTH
+          N = normalize(N + vec3(vWr, 0.0, -vWr)*0.20*(0.35+uRide.x));
+          base *= 1.0 + vWr*0.08;
         #endif
         float ndl = max((dot(N,uSun)+uWrap)/(1.0+uWrap),0.0);
         vec3 amb = mix(uGndCol, uSkyCol, N.y*0.5+0.5);
-        /* riding into tree shade now visibly dims the rider */
         float sh = sunShadow(vW, N, dist);
         vec3 col = base*(uSunCol*ndl*(1.0-0.85*sh) + amb*0.55);
-        if(uSpec > 0.001){
+        float spec = uSpec;
+        #ifdef HAS_CLOTH
+          spec += 0.22 + 0.28*uRide.x;
+        #endif
+        if(spec > 0.001){
           vec3 hv = normalize(uSun - vd);
-          col += uSunCol*pow(max(dot(N,hv),0.0), 60.0)*uSpec;
+          col += uSunCol*pow(max(dot(N,hv),0.0), mix(52.0, 20.0, uRide.x))*spec;
         }
         if(uRim > 0.001){
           float f = pow(1.0 - max(dot(N,-vd),0.0), 3.0);
@@ -100,7 +163,7 @@ function riderKit(jacket) {
   const { soft, hard } = buildRiderB(rig, pal);
   const wS = solveWeights(soft, rig), wH = solveWeights(hard, rig);
   const gSoft = bufToGeometry(soft, wS, false, true);
-  const gHard = bufToGeometry(hard, wH, false, false);
+  const gHard = bufToGeometry(hard, wH, false, true);
   // skinned bounds: the bind-pose sphere, grown so a grab or a tumble never pops
   for (const g of [gSoft, gHard]) {
     if (!g.boundingSphere) g.computeBoundingSphere();
@@ -108,8 +171,8 @@ function riderKit(jacket) {
   }
   return (_RKIT[key] = {
     gSoft, gHard, pal,
-    matSoft: riderMat({ wrap: 0.36, rim: 0.055, map: fabricTex(), mapAmt: 0.34 }),
-    matHard: riderMat({ wrap: 0.30, spec: 0.55, rim: 0.06 }),
+    matSoft: riderMat({ wrap: 0.44, rim: 0.16, map: gameTex('jacket'), mapB: gameTex('pants'), mapAmt: 0.78, cloth: true }),
+    matHard: riderMat({ wrap: 0.34, spec: 0.72, rim: 0.10, map: gameTex('boots'), board: gameTex('board'), mapAmt: 0.42 }),
     stats: {
       tris: (gSoft.index.count + gHard.index.count) / 3,
       verts: gSoft.attributes.position.count + gHard.attributes.position.count,
@@ -163,8 +226,8 @@ const GRAB = { poleSign: 1, lean: 1, tuck: 0.30, dbg: null };
 let RUT_K = 0.92;   // how far into its own rut the board sits (live: FL.dbg.rutK)
 const SEC = {
   amt: 1,          // master gate; 0 == shipped pose exactly
-  omK: 7.0,        // body inertia: how fast the torso catches the board's turn
-  latK: 4.5,       // slower still - load builds over the arc
+  omK: 5.4,        // body inertia: how fast the torso catches the board's turn
+  latK: 3.8,       // slower still - load builds over the arc
   /* MEASURED over a scripted slalom (974 grounded frames): |omega| p50 0.76,
      p90 1.09, max 1.42 rad/s; lateral load p50 0.98, p90 2.20, max 3.66 g.
      Both drivers are therefore soft-saturated (tanh) rather than clamped - a
@@ -173,10 +236,10 @@ const SEC = {
      formula. tanh is linear near zero and never exceeds 1. */
   omN: 1.15,       // rad/s that maps to ~0.76 of full swing
   latN: 1.80,      // g that maps to ~0.66 of full lean
-  cr: 0.30,        // counter-rotation, rad at full turn
-  arm: 0.34,       // arm swing from turn rate
-  lat: 0.26,       // spine lean from centrifugal load
-  head: 0.26,      // head leads into the turn
+  cr: 0.22,        // keep hips/shoulders square — no windmill counter-rotation
+  arm: 0.16,       // hands stay over the bindings
+  lat: 0.28,       // hip angulation, not a dumped torso
+  head: 0.30,      // look down the fall line
   /* landing: a velocity impulse into a damped spring, so peak compression is
      v0/omega_d * exp(-zeta*omega_n*t_peak). omega_n 7.5, zeta 0.60 puts the
      bottom of the absorption 0.155 s after touchdown, which is about how long
@@ -184,12 +247,11 @@ const SEC = {
      as a flinch. MEASURED depth/settle: 4 m/s 3.5cm/0.40s, 8 m/s 7.0cm/0.43s,
      11 m/s 9.5cm/0.75s, 16 m/s 13.9cm/0.82s; worst-case full tuck + 16 m/s
      leaves the knee at 43 deg and the boot still pinned to its binding. */
-  land: 0.15,      // impulse (m/s of spring velocity) per m/s of impact
-  landK: 56,       // stiffness (omega_n 7.48 rad/s)
-  landD: 9.0,      // damping (zeta 0.60)
-  landMax: 0.15,   // safety net only (m): impact is clamped at 16 m/s, which
-                   // folds 13.9cm, so this never engages in play
-  ant: 0.16,       // ollie anticipation from charge
+  land: 0.22,      // impulse (m/s of spring velocity) per m/s of impact
+  landK: 48,       // stiffness — slightly softer, more soak
+  landD: 8.2,      // damping
+  landMax: 0.18,
+  ant: 0.26,       // ollie anticipation from charge
   dbg: null
 };
 /* ---- wipeout pose (R3) -------------------------------------------------
@@ -266,20 +328,23 @@ function aimBone(bone, dirWorld) {
   _rq1.setFromUnitVectors(DOWN_V, dirWorld);
   bone.quaternion.copy(_rq2).multiply(_rq1);
 }
-/* two-bone IK: put the end of (a -> b -> end) on target, knee toward pole */
+/* two-bone IK: put the end of (a -> b -> end) on target, knee toward pole.
+   pole MUST be world-space. A bind-space pole crossed with a world hip->foot
+   flips the bend axis as the rider yaws — that's the spinning-thigh look. */
 function ikChain(a, b, L1, L2, target, pole) {
   a.updateMatrixWorld(true);
   const hip = a.getWorldPosition(_rv1);
   const to = _rv2.subVectors(target, hip);
   const d = clamp(to.length(), Math.abs(L1 - L2) + 0.02, L1 + L2 - 0.004);
   to.normalize();
-  // interior knee angle, then the thigh's offset from the hip->target line.
-  // (the offset needs the joint's deviation from straight, pi - bend, so the
-  //  cosine term is subtracted - with + the chain never closes on the target)
   const bend = Math.acos(clamp((L1 * L1 + L2 * L2 - d * d) / (2 * L1 * L2), -1, 1));
   const off = Math.atan2(L2 * Math.sin(bend), L1 - L2 * Math.cos(bend));
   const axis = _rv3.crossVectors(pole, to);
-  if (axis.lengthSq() < 1e-8) axis.set(1, 0, 0); else axis.normalize();
+  if (axis.lengthSq() < 1e-6) {
+    axis.crossVectors(_rs3.set(0, 1, 0), to);
+    if (axis.lengthSq() < 1e-6) axis.set(1, 0, 0);
+  }
+  axis.normalize();
   const dirA = to.clone().applyAxisAngle(axis, off);
   aimBone(a, dirA);
   a.updateMatrixWorld(true);
@@ -311,10 +376,11 @@ function makeClips(rig) {
     track('upperB', [0, 0.34, 0.7, 1.0], [[-0.10, 0.26, 0], [0.34, 0.10, 0], [0.30, 0.10, 0], [-0.10, 0.26, 0]]),
   ]);
   // ollie: load the tail, snap the shoulders up, reset
-  clips.pop = new THREE.AnimationClip('pop', 0.62, [
-    track('upperF', [0, 0.10, 0.26, 0.62], [[-0.25, -0.32, 0], [-0.85, -0.42, 0], [0.75, -0.55, 0], [-0.25, -0.32, 0]]),
-    track('upperB', [0, 0.10, 0.26, 0.62], [[-0.12, 0.28, 0], [-0.70, 0.36, 0], [0.62, 0.50, 0], [-0.12, 0.28, 0]]),
-    track('spine2', [0, 0.12, 0.30, 0.62], [[0, 0, 0], [0.22, 0, 0], [-0.30, 0, 0], [0, 0, 0]]),
+  clips.pop = new THREE.AnimationClip('pop', 0.58, [
+    track('upperF', [0, 0.08, 0.22, 0.58], [[-0.32, -0.38, 0], [-1.05, -0.52, 0], [0.95, -0.68, 0], [-0.28, -0.32, 0]]),
+    track('upperB', [0, 0.08, 0.22, 0.58], [[-0.16, 0.32, 0], [-0.88, 0.44, 0], [0.80, 0.62, 0], [-0.14, 0.28, 0]]),
+    track('spine2', [0, 0.10, 0.26, 0.58], [[0.04, 0, 0], [0.34, 0, 0], [-0.42, 0, 0], [0, 0, 0]]),
+    track('chest', [0, 0.10, 0.26, 0.58], [[0, 0, 0], [0.18, 0, 0], [-0.22, 0, 0], [0, 0, 0]]),
   ]);
   return clips;
 }
@@ -446,12 +512,17 @@ class RiderBody {
   }
 
   update(r, dt) {
-    const p = r.p;
+    const p = r.pDraw || r.p;
     const air = !r.grounded;
-    // orientation basis: up blends to world-up in the air
+    const yaw = (r.yawDraw !== undefined) ? r.yawDraw : r.yaw;
+    const nrm = r.nDraw || r.n;
+    // orientation basis: up blends to world-up in the air, then smoothed
     const upBlend = clamp(1 - r.airT * 1.8, 0, 1);
-    this._up.set(r.n.x * upBlend, lerp(1, r.n.y, upBlend), r.n.z * upBlend).normalize();
-    this._f.set(Math.sin(r.yaw), 0, Math.cos(r.yaw));
+    this._up.set(nrm.x * upBlend, lerp(1, nrm.y, upBlend), nrm.z * upBlend).normalize();
+    if (!this._upSm) this._upSm = this._up.clone();
+    this._upSm.lerp(this._up, 1 - Math.exp(-16 * dt)).normalize();
+    this._up.copy(this._upSm);
+    this._f.set(Math.sin(yaw), 0, Math.cos(yaw));
     const d = this._f.dot(this._up);
     this._f.addScaledVector(this._up, -d).normalize();
     this._r.crossVectors(this._up, this._f).normalize();
@@ -566,44 +637,78 @@ class RiderBody {
     const asw = SEC.arm * turn * sa;
     if (SEC.dbg) SEC.dbg = { turn, latG, landC, ant, cnt, bnk, om, sp: spRaw };
 
-    /* board: edge roll + a touch of lift on the tail under load */
+    /* Sliding turn vs carve. Always lean INTO the turn.
+       Right (toeside): sit, knees bent, mass over the right/toe edge.
+       Left (heelside): sit in the chair, mass over the left/heel edge.
+       Sit/lean follow |edge| (commit), not only a clean carve — a held
+       turn that washes a bit must still look like the photo, not stay tall. */
+    const apex = Math.abs(edge);
+    const right = Math.max(edge, 0);
+    const left = Math.max(-edge, 0);
+    const sk = clamp(fin(r.skid, 0), 0, 1.4);
+    const commit = apex * sa;
+    const carveQ = clamp(apex * (1.2 - sk * 1.15), 0, 1) * sa;
+    const slideQ = clamp(sk * 0.85 + apex * (1 - carveQ) * 0.4, 0, 1) * sa;
+
     B.board.quaternion.copy(this.boardBindQ);
-    B.board.rotation.z = -edge * 0.62;
-    B.board.rotation.x = -sp * 0.02 * (air ? 0 : 1);
-    B.board.position.y = Math.abs(edge) * 0.03 + GRAB.tuck * gt;
+    const boardRoll = -edge * (0.34 + 0.28 * commit + 0.22 * carveQ);
+    this._brSm = this._brSm === undefined ? boardRoll
+      : this._brSm + (boardRoll - this._brSm) * (1 - Math.exp(-14 * dt));
+    B.board.rotation.z = this._brSm;
+    B.board.rotation.x = -sp * 0.02 * (air ? 0 : 1) - ant * 0.08;
+    B.board.position.y = apex * (0.016 + 0.020 * carveQ) + GRAB.tuck * gt + landC * 0.08;
 
-    /* hips: drop into the crouch, bank into the turn */
-    const crouchAmt = clamp(cr * 0.235 + (air ? 0.085 : 0) - this.popT * 0.05, 0, 0.235)
-      + landC;                              // landing spring rides on top
-    B.pelvis.position.y = this.bindPelvisY - crouchAmt;
-    const wb = Math.sin(t * 5.3) * 0.012 * (1 - bal) + wob * 0.05;
-    P.pelvis.set(0.06 + cr * 0.16 + sp * 0.05, -edge * 0.30 + wb, -edge * 0.13);
-    /* spine: split the lean and the counter-rotation over three joints */
-    const lean = -0.02 - sp * 0.12 - cr * 0.22 + (air ? -0.06 : 0) + (down ? 0.5 : 0)
-      - ant * 0.9 - landC * 1.3;
-    P.spine1.set(lean * 0.34, -edge * 0.10 + wob * 0.03 + bnk * 0.34, -edge * 0.07 + cnt * 0.22);
-    P.spine2.set(lean * 0.36, -edge * 0.09 + wob * 0.03 + bnk * 0.33, -edge * 0.06 + cnt * 0.30);
-    P.chest.set(lean * 0.30 + Math.sin(t * 1.7) * 0.008, -edge * 0.08 + bnk * 0.33,
-      -edge * 0.10 + cnt * 0.48);
-    /* head: look down the hill, lead the turn a little */
+    const pump = (!air && !down) ? Math.sin(t * 1.7) * 0.003 * sp * (0.25 + 0.55 * commit) : 0;
+
+    const crouchTgt = clamp(
+      0.048 + cr * 0.090
+      + commit * 0.100
+      + left * 0.038
+      + right * 0.024
+      + (air ? 0.045 : 0) - this.popT * 0.05, 0, 0.228)
+      + landC + pump;
+    this._crSm = this._crSm === undefined ? crouchTgt
+      : this._crSm + (crouchTgt - this._crSm) * (1 - Math.exp(-12 * dt));
+    B.pelvis.position.y = this.bindPelvisY - this._crSm;
+    /* Hips stay square on the board. Lean is in the spine; knees bend
+       because the pelvis DROPPED, not because the hip bone spun. */
+    B.pelvis.position.x = edge * 0.022 * sa;
+    B.pelvis.position.z = 0.012 * sa;
+    const wb = Math.sin(t * 5.3) * 0.006 * (1 - bal) + wob * 0.03;
+    const breathe = Math.sin(t * 1.55) * 0.006 * (1 - clamp(sp, 0, 1));
+    P.pelvis.set(
+      0.04 + left * 0.08 + cr * 0.03 + landC * 0.10 + breathe,
+      -edge * 0.08 + wb,
+      0.08);
+    const lean = 0.03 - cr * 0.03 + left * 0.05 - right * 0.06
+      + (air ? -0.06 : 0) + (down ? 0.35 : 0) - ant * 0.45 - landC * 0.40;
+    P.spine1.set(lean * 0.20, -edge * 0.10 * commit, 0.08);
+    P.spine2.set(lean * 0.12, -edge * 0.06 * commit, 0.05);
+    P.chest.set(lean * 0.06 + breathe, -edge * 0.03 * commit, 0.03);
     const hl = SEC.head * turn * sa;
-    P.neck.set(0.10 + sp * 0.05, edge * 0.05 - bnk * 0.30, edge * 0.10 + hl * 0.35);
-    P.head.set(0.06 + sp * 0.06 - cr * 0.10 + landC * 0.8, edge * 0.04 - bnk * 0.34,
-      edge * 0.30 + Math.sin(t * 0.9) * 0.02 + hl * 0.65);
+    P.neck.set(0.14 + sp * 0.02, -bnk * 0.03, 0.20 + hl * 0.28);
+    P.head.set(0.08 + sp * 0.02 - cr * 0.03 + landC * 0.30, -bnk * 0.04,
+      0.24 + Math.sin(t * 0.9) * 0.012 + hl * 0.42);
 
-    /* arms: procedural balance pose (a grab overrides it with IK below) */
-    const swing = Math.sin(t * 2.1) * 0.06;
+    const swing = Math.sin(t * 2.0) * 0.030 * (0.4 + 0.6 * sp);
     if (!grab) {
-      const out = 0.17 + Math.abs(edge) * 0.22 + (1 - bal) * 0.40 + Math.abs(turn) * 0.10 * sa;
-      P.clavF.set(0.04 + (1 - bal) * 0.12, -0.05, 0);
-      P.clavB.set(0.02, 0.05, 0);
-      P.upperF.set(-0.22 - sp * 0.30 + swing - (1 - bal) * 0.5 + wob * 0.16
-        - asw * 0.55 - landC * 1.9 + ant * 0.45, -out, -0.12 - edge * 0.10);
-      P.upperB.set(-0.10 - sp * 0.14 - swing - wob * 0.16
-        + asw * 0.42 - landC * 1.2 + ant * 0.30, out * 0.86, 0.10 - edge * 0.08);
-      P.foreF.set(-0.66 - cr * 0.55 - (1 - bal) * 0.5, -0.14, 0);
-      P.foreB.set(-0.52 - cr * 0.45, 0.14, 0);
-      P.handF.set(0.12, 0, 0); P.handB.set(0.10, 0, 0);
+      const out = lerp(0.20 + slideQ * 0.14, 0.08 + right * 0.06, carveQ) + (1 - bal) * 0.14;
+      P.clavF.set(0.04 + right * 0.03, -0.02, -0.02);
+      P.clavB.set(0.02, 0.04 + slideQ * 0.04, 0.02);
+      P.upperF.set(
+        -0.42 - commit * 0.22 - cr * 0.06 + swing - (1 - bal) * 0.16
+          - asw * 0.08 - landC * 0.55 + ant * 0.18 - right * 0.16,
+        -out,
+        -0.10 - commit * 0.10);
+      P.upperB.set(
+        -0.22 - commit * 0.24 - cr * 0.04 - swing - (1 - bal) * 0.10
+          + asw * 0.06 - landC * 0.35 + ant * 0.12 + slideQ * 0.10,
+        out * (0.85 + 0.30 * slideQ),
+        0.08 + commit * 0.10);
+      P.foreF.set(-0.85 - commit * 0.30 - cr * 0.10 - right * 0.14, -0.04, 0.10);
+      P.foreB.set(-0.62 - commit * 0.32 - cr * 0.08, 0.08 + slideQ * 0.08, -0.08);
+      P.handF.set(0.10 + right * 0.06, 0, 0.04);
+      P.handB.set(0.08, -slideQ * 0.04, -0.02);
     } else {
       /* fold the torso down toward the rail so the front arm is not asked to
          span more than it has (see GRAB.lean) - the spine lines above ran
@@ -632,7 +737,7 @@ class RiderBody {
          boots are pinned to the bindings, so extension comes from dropping
          the deck away from the hips, not from fighting the leg IK. */
       const ca = clamp(0.235 * (C.crouch + C.crAmp * s1), 0, 0.235);
-      B.pelvis.position.y = this.bindPelvisY - lerp(crouchAmt, ca, a);
+      B.pelvis.position.y = this.bindPelvisY - lerp(this._crSm || 0, ca, a);
       B.board.position.y = lerp(B.board.position.y, C.board + C.boardAmp * s2, a);
       /* hips and spine: arch back and twist, out of phase with the arms */
       const arch = C.arch * (0.45 + 0.55 * s3), tw = C.twist * s2;
@@ -660,13 +765,16 @@ class RiderBody {
     /* world matrices must be current before any IK reads them */
     this.root.updateMatrixWorld(true);
 
-    /* legs: pin the boots to the bindings, wherever the board went */
+    /* legs: pin the boots to the bindings. Pole is the toe side in WORLD
+       space so the knees always bend the same way — never spin around. */
     const boardM = B.board.matrixWorld;
+    const poleW = _rs4.copy(this.poleF).transformDirection(this.root.matrixWorld).negate();
+    if (poleW.lengthSq() < 1e-6) poleW.set(1, 0, 0); else poleW.normalize();
     for (const [th, sh, ft, l1, l2] of [
       ['thighF', 'shinF', 'footF', this.LL.thigh, this.LL.shin],
       ['thighB', 'shinB', 'footB', this.LL.thighB, this.LL.shinB]]) {
       const target = _rs1.copy(this.footLocal[ft]).applyMatrix4(boardM).clone();
-      ikChain(B[th], B[sh], l1, l2, target, this.poleF);
+      ikChain(B[th], B[sh], l1, l2, target, poleW);
       // boot stays flat on the deck: reapply its bind orientation in board space
       const wq = B.board.getWorldQuaternion(_rq2).multiply(this.footQLocal[ft]);
       B[ft].parent.getWorldQuaternion(_rq1).invert();
@@ -701,9 +809,9 @@ class RiderBody {
       const s = this.sc[i];
       const vx = (s.p.x - s.o.x), vy = (s.p.y - s.o.y), vz = (s.p.z - s.o.z);
       s.o.copy(s.p);
-      s.p.x += vx * 0.86 + (Math.sin(t * 7 + i) * 0.02) * dt;
-      s.p.y += vy * 0.86 + g * dt * dt;
-      s.p.z += vz * 0.86 + windZ * dt * dt * 9;
+      s.p.x += vx * 0.82 + (Math.sin(t * 9 + i) * 0.034 + turn * 0.012) * dt;
+      s.p.y += vy * 0.82 + g * dt * dt;
+      s.p.z += vz * 0.82 + windZ * dt * dt * 11;
       _rv2.subVectors(s.p, prev);
       const dl = _rv2.length() || 1e-5;
       s.p.copy(prev).addScaledVector(_rv2, s.len / dl);
@@ -762,3 +870,4 @@ const _flipQ = new THREE.Quaternion(), _FLIPAX = new THREE.Vector3(1, 0, 0);
 const _flipC = new THREE.Vector3(), _flipD = new THREE.Vector3();
 /* Approx hip height of the rider model in metres - the flip pivot. */
 const FLIP_COM = 0.95;
+

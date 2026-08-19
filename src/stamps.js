@@ -52,7 +52,7 @@ const ST_BERM = 0.55;
    mass piled well up the wall - a cut bank, not a lip - so the trail reads as
    snow MOVED rather than snow removed. Consumed by BOTH the CPU authority
    (displaceAt) and DF_STAMP_FRAG, which interpolates this same constant. */
-const ST_BERMH = 0.55;
+const ST_BERMH = 0.68;
 
 /* The wake ribbon's own `depth` is a legacy ~12 cm DECAL, tuned when the
    trail was a translucent overlay rather than geometry. The store holds
@@ -257,12 +257,19 @@ class StampStore {
       const depth = self.u16[i * 8 + 4] / 65535 * ST_DMAX;
       o.n++;
       if (lat <= halfW) {
-        /* trench floor, rounded so the cross-section is not a slot */
-        const u = lat / halfW;
-        const d = depth * (1 - u * u * 0.35);
+        /* Dual-rail snowboard track: two edge grooves + packed mid-sole.
+           Must match DF_STAMP_FRAG exactly. */
+        const railC = halfW * 0.68;
+        const railW = Math.max(halfW * 0.26, 0.035);
+        const tt = (lat - railC) / railW;
+        const rail = Math.exp(-tt * tt);
+        const mid = 1 - smoothstep(0, railC * 0.9, lat);
+        const d = depth * (0.28 * mid + 1.0 * rail);
         if (d > o.depth) o.depth = d;
         const c = (self.u8[b + 14] >> 4) / 15;
-        if (c > o.comp) o.comp = c;
+        /* whole board width is compacted snow, rails extra so */
+        const ck = c * (0.52 + 0.48 * mid + 0.22 * rail);
+        if (ck > o.comp) o.comp = ck;
         const ic = (self.u8[b + 14] & 15) / 15;
         if (ic > o.ice) o.ice = ic;
       } else {
@@ -304,3 +311,4 @@ class StampStore {
     };
   }
 }
+

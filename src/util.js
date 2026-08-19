@@ -24,7 +24,7 @@ const TAU = Math.PI * 2;
    for a target omega_n with damping zeta you want stiff = omega_n^2 and
    damp = 2*zeta*omega_n - do NOT raise stiff without raising damp or the lean
    overshoots and the board wobbles. */
-const RESP = { steerK: 34, stiff: 96, damp: 16.6 };
+const RESP = { steerK: 18, stiff: 48, damp: 13.86 };
 /* Chase-camera zoom. A pure SIMILARITY TRANSFORM about the rider: every offset
    from the rider (orbit distance, height, look-ahead, look height, shake) is
    multiplied by this, so the framing - where the rider sits in the frame, the
@@ -41,7 +41,7 @@ const RESP = { steerK: 34, stiff: 96, damp: 16.6 };
    collapses onto the eye and the ground-clearance floor tips the camera to nadir
    (measured: pitch 38deg down at 0.10, straight down at 0). Real first person is a
    separate branch, not a slider value: see CAMZ_FP in the todo. */
-const CAMZ = { zoom: 0.6 };
+const CAMZ = { zoom: 0.48 };
 const OBS_S = 5;
 const DEG = Math.PI / 180;
 // exponential smoothing that is frame-rate independent
@@ -278,3 +278,4 @@ function todResolve() {
     return { hour: +OPT.tod, src: 'opt' };
   return { hour: todClock(), src: 'clock' };
 }
+

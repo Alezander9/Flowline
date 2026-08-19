@@ -10,22 +10,22 @@ const CHEST_YAW = 0.92;                              // total spine twist: the s
 const yawV = (ang, r) => V3(Math.cos(ang) * r, 0, -Math.sin(ang) * r);
 
 function bindJoints() {
-  const chest = V3(0, 0.850, 0);
+  const chest = V3(0, 0.872, 0);
   const shoulderAx = yawV(CHEST_YAW, 1);             // shoulder line, points to the tail side
-  const shB = chest.clone().add(V3(0, 0.075, 0)).addScaledVector(shoulderAx, 0.172);
-  const shF = chest.clone().add(V3(0, 0.075, 0)).addScaledVector(shoulderAx, -0.172);
+  const shB = chest.clone().add(V3(0, 0.062, 0)).addScaledVector(shoulderAx, 0.132);
+  const shF = chest.clone().add(V3(0, 0.062, 0)).addScaledVector(shoulderAx, -0.132);
   const out = shoulderAx.clone();
   const front = V3(Math.sin(CHEST_YAW), 0, Math.cos(CHEST_YAW));   // chest facing (toe side)
   const J = {
     board: V3(0, 0.0, 0), boardAim: V3(0, -1, 0),
     pelvis: V3(0, 0.520, 0), spine1: V3(0, 0.620, 0), spine2: V3(0, 0.730, 0),
-    chest, neck: V3(0, 0.950, -0.004), head: V3(0, 1.028, 0.012), headAim: V3(0, 0.90, 0.012),
-    clavF: chest.clone().add(V3(0, 0.070, 0)).addScaledVector(shoulderAx, -0.055),
-    clavB: chest.clone().add(V3(0, 0.070, 0)).addScaledVector(shoulderAx, 0.055),
+    chest, neck: V3(0, 0.978, -0.004), head: V3(0, 1.068, 0.010), headAim: V3(0, 0.92, 0.010),
+    clavF: chest.clone().add(V3(0, 0.058, 0)).addScaledVector(shoulderAx, -0.048),
+    clavB: chest.clone().add(V3(0, 0.058, 0)).addScaledVector(shoulderAx, 0.048),
     upperF: shF, upperB: shB,
     foreF: shF.clone().add(V3(0, -0.225, 0)).addScaledVector(out, -0.030).addScaledVector(front, 0.020),
     foreB: shB.clone().add(V3(0, -0.225, 0)).addScaledVector(out, 0.030).addScaledVector(front, 0.010),
-    hipF: V3(0, 0.520, 0.082), hipB: V3(0, 0.520, -0.082),
+    hipF: V3(0, 0.512, 0.076), hipB: V3(0, 0.512, -0.076),
     kneeF: V3(0.052, 0.322, 0.170), kneeB: V3(0.048, 0.322, -0.152),
     ankleF: V3(0.004, 0.132, 0.238), ankleB: V3(0.004, 0.132, -0.238),
   };
@@ -307,3 +307,4 @@ function bufToGeometry(buf, skin, recompute, withUv) {
   g.boundingSphere.radius *= 1.9;         // room for the pose to move verts
   return g;
 }
+
